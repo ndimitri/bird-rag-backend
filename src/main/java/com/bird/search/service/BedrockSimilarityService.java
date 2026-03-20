@@ -25,15 +25,31 @@ import software.amazon.awssdk.services.bedrockagentruntime.model.*;
 
 @Service
 @RequiredArgsConstructor
+/**
+ * Service responsible for semantic retrieval against an AWS Bedrock Knowledge Base.
+ *
+ * <p>The retrieval pipeline performs vector search and applies Bedrock reranking
+ * to improve relevance of the final returned documents.</p>
+ */
 public class BedrockSimilarityService {
   @Value("${aws.bedrock.knowledge-base-id}")
   private String knowledgeBaseId;
   @Value("${aws.bedrock.reranking-model-arn}")
   private String rerankingModelArn;
-  private static final int MAX_RESULTS = 5;
-  private static final int MAX_RERANKING_RESULT = 3;
+  private static final int MAX_RESULTS = 10;
+  private static final int MAX_RERANKING_RESULT = 5;
   private final BedrockAgentRuntimeClient bedrockAgentRuntimeClient;
 
+  /**
+   * Searches the configured Knowledge Base with a natural-language query.
+   *
+   * <p>The method first retrieves vector candidates, then applies reranking using
+   * the configured Bedrock reranking model, and finally maps results to
+   * {@link RetrievedResult} DTOs.</p>
+   *
+   * @param query end-user search query
+   * @return ranked list of retrieved results enriched with parsed metadata
+   */
   public List<RetrievedResult> search(String query) {
 
 //    Metthod without reranking
@@ -76,6 +92,7 @@ public class BedrockSimilarityService {
         .build();
 
     RetrieveResponse response = this.bedrockAgentRuntimeClient.retrieve(request);
+
     return response.retrievalResults().stream().map((result) -> {
       KbDocument doc = KbContentParser.parse(result.content().text());
       return new RetrievedResult(doc.text(), result.score(), doc.metadata());

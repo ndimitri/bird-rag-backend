@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: bird-search
+
+server:
+  port: 8080
+
+aws:
+  region: us-east-1                          # ← change to your region
+  access-key-id: XXXXXXXXXXXXXX
+  secret-access-key: XXXXXXXXXXXXXXX
+  bedrock:
+    knowledge-base-id: XXXXXXXXXXXXXXXXXXXXXXX
+    reranking-model-arn: arn:aws:bedrock:us-east-1::foundation-model/cohere.rerank-v3-5:0
+
+logging:
+  level:
+    com.bird: DEBUG

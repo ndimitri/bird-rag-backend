@@ -15,18 +15,29 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST controller for semantic similarity and document retrieval.
+ *
+ * <p>Exposes endpoints to search a Bedrock Knowledge Base using vector search
+ * and reranking to retrieve the most relevant documents.</p>
+ */
 @RestController
-@RequestMapping({"/api/similarity"})
+@RequestMapping("/api/similarity")
+@RequiredArgsConstructor
 public class SimilarityController {
+
   private final BedrockSimilarityService service;
 
-  @GetMapping({"/search"})
+  /**
+   * Searches the Knowledge Base for documents matching the query.
+   *
+   * @param query natural-language search query
+   * @return list of ranked retrieval results with metadata
+   */
+  @GetMapping("/search")
   public ResponseEntity<List<RetrievedResult>> search(@RequestParam String query) {
-    List<RetrievedResult> results = this.service.search(query);
+    List<RetrievedResult> results = service.search(query);
     return ResponseEntity.ok(results);
   }
 
-  public SimilarityController(final BedrockSimilarityService service) {
-    this.service = service;
-  }
 }

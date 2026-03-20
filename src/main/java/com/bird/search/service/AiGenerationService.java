@@ -1,17 +1,17 @@
 package com.bird.search.service;
 
 
-import com.bird.search.config.AwsConfig;
 import com.bird.search.dto.AttributeGenerationResponse;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.core.SdkBytes;
-import software.amazon.awssdk.services.bedrockagentruntime.BedrockAgentRuntimeClient;
+import software.amazon.awssdk.services.bedrockruntime.model.InferenceConfiguration;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
-import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelRequest;
-import software.amazon.awssdk.services.bedrockruntime.model.InvokeModelResponse;
+import software.amazon.awssdk.services.bedrockruntime.model.ContentBlock;
+import software.amazon.awssdk.services.bedrockruntime.model.ConverseRequest;
+import software.amazon.awssdk.services.bedrockruntime.model.ConverseResponse;
+import software.amazon.awssdk.services.bedrockruntime.model.Message;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +21,19 @@ public class AiGenerationService {
   private final ObjectMapper mapper = new ObjectMapper();
   private final BedrockRuntimeClient bedrockClient;
 
+  @Value("${aws.bedrock.generation-model-id}")
+  private String generationModelId;
+
+  /**
+   * Generates a full attribute payload from a partial natural-language description.
+   *
+   * <p>The method sends the prompt to Bedrock Converse, sanitizes the textual output,
+   * and deserializes the resulting JSON into {@link AttributeGenerationResponse}.</p>
+   *
+   * @param partialDescription user-provided description used as generation context
+   * @return structured attribute generation response
+   * @throws RuntimeException if the model output is empty or cannot be parsed as valid JSON
+   */
   public AttributeGenerationResponse generateAttribute(String partialDescription){
     String prompt = """
             You are an assistant that generates metadata for variables in a data governance system.
@@ -52,44 +65,65 @@ public class AiGenerationService {
             - Respond STRICTLY in JSON.
             """.formatted(partialDescription);
 
-    String body = """
-            {
-              "anthropic_version": "bedrock-2023-05-31",
-              "max_tokens": 1024,
-              "messages": [
-                {
-                  "role": "user",
-                  "content": "%s"
-                }
-              ]
-            }
-            """.formatted(prompt);
-
-    InvokeModelRequest request = InvokeModelRequest.builder()
-        .modelId("anthropic.claude-3-sonnet-20240229-v1:0")
-        .contentType("application/json")
-        .accept("application/json")
-        .body(SdkBytes.fromUtf8String(body))
+    ConverseRequest request = ConverseRequest.builder()
+        .modelId(generationModelId)
+        .messages(Message.builder()
+            .role("user")
+            .content(ContentBlock.builder().text(prompt).build())
+            .build())
+        .inferenceConfig(InferenceConfiguration.builder()
+            .maxTokens(1024)
+            .temperature(0.2f)
+            .build())
         .build();
 
-    InvokeModelResponse response = bedrockClient.invokeModel(request);
+    ConverseResponse response = bedrockClient.converse(request);
 
-    String raw = response.body().asUtf8String();
-
-    // Claude renvoie un JSON avec un champ "content" → il faut l'extraire
     try {
-      JsonNode root = mapper.readTree(raw);
-      String aiJson = root.get("content").get(0).get("text").asText();
+      String aiRaw = response.output().message().content().stream()
+          .map(ContentBlock::text)
+          .filter(t -> t != null && !t.isBlank())
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("Empty model output"));
+
+      String aiJson = sanitizeJsonPayload(aiRaw);
       return mapper.readValue(aiJson, AttributeGenerationResponse.class);
     } catch (Exception e) {
-      throw new RuntimeException("Invalid AI JSON: " + raw, e);
+      throw new RuntimeException("Invalid AI JSON from Converse API", e);
     }
-
   }
 
+  /**
+   * Removes markdown code fences and trims surrounding non-JSON text.
+   *
+   * <p>This protects JSON deserialization when a model wraps the payload in
+   * ```json blocks or adds short prose before/after the JSON object.</p>
+   *
+   * @param raw raw model text output
+   * @return sanitized JSON string ready for Jackson parsing
+   */
+  private String sanitizeJsonPayload(String raw) {
+    String s = raw == null ? "" : raw.trim();
 
+    // Remove fenced markdown blocks: ```json ... ``` or ``` ... ```
+    if (s.startsWith("```")) {
+      int firstNewLine = s.indexOf('\n');
+      if (firstNewLine > -1) {
+        s = s.substring(firstNewLine + 1).trim();
+      }
+      if (s.endsWith("```")) {
+        s = s.substring(0, s.length() - 3).trim();
+      }
+    }
 
+    // Keep first JSON object if extra prose is present.
+    int start = s.indexOf('{');
+    int end = s.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      s = s.substring(start, end + 1);
+    }
 
-
+    return s;
+  }
 
 }
