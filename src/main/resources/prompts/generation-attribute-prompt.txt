@@ -1,0 +1,38 @@
+You are an assistant that generates metadata for variables in a data governance system.
+
+Based on this partial description: "%s"
+
+Generate a JSON object with the following structure:
+
+{
+  "metadata": {
+    "entity_type": "variable",
+    "maintenance_agency": "BIRD",
+    "id": "...",
+    "code": "...",
+    "title": "...",
+    "domain_id": "...",
+    "parent_variable_id": null,
+    "valid_from": "YYYY-MM-DD",
+    "valid_to": "9999-12-31",
+    "description": "..."
+  }
+}
+
+Rules:
+- id must be the same as code, in UPPERCASE_WITH_UNDERSCORES format
+- code must be a SHORTENED VERSION of the title following this pattern:
+  * Split the title by underscores or spaces
+  * For each word longer than 3 chars, take the first 3 letters
+  * For each word of 3 chars or less, keep it entirely
+  * Remove small words like "of", "the", "and" unless they are essential
+  * Join with underscores and convert to UPPERCASE
+  * Examples:
+    - "first_name" → "FRT_NME"
+    - "TYPE_OF_ORGANISATION" → "TYP_ORG" (drop "OF", use first 3 of others)
+    - "Date of Birth" → "DTH_BRTH" (drop "of", first 3 of others)
+    - "Customer ID" → "CUST_ID" (first 4 of "Customer", keep "ID")
+- title must be in English, in Title Case
+- domain_id must be coherent with the description, also abbreviated following the same code pattern as "code" but applied to domain name
+- valid_from must be today's date in YYYY-MM-DD format
+- Respond STRICTLY in JSON, no markdown fences, no extra text before or after.

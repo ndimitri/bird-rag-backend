@@ -3,8 +3,16 @@ package com.bird.search.service;
 
 import com.bird.search.dto.AttributeGenerationResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.tomcat.jni.Buffer;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.bedrockruntime.model.InferenceConfiguration;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
@@ -15,14 +23,42 @@ import software.amazon.awssdk.services.bedrockruntime.model.Message;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AiGenerationService {
 
 
   private final ObjectMapper mapper = new ObjectMapper();
   private final BedrockRuntimeClient bedrockClient;
+  private final ResourceLoader resourceLoader;
 
   @Value("${aws.bedrock.generation-model-id}")
   private String generationModelId;
+
+  private String promptTemplate; // Cached prompt template
+
+
+  /**
+   * Lazy-loads the prompt template from external file.
+   */
+  private String getPromptTemplate(){
+    if(promptTemplate == null) {
+      try{
+        Resource resource = resourceLoader.getResource("classpath:prompts/generation-attribute-prompt.txt");
+        try(BufferedReader reader = new BufferedReader(
+            new InputStreamReader(resource.getInputStream())
+        )) {
+          promptTemplate = reader.lines().collect(Collectors.joining("\n"));
+        }
+        log.info("Loaded prompt template from classpath:prompts/generation-attribute-prompt.txt");
+        } catch (Exception e) {
+          log.error("Failed to load prompt template", e);
+          throw new RuntimeException("Could not load prompt template", e);
+        }
+    }
+    return promptTemplate;
+  }
+
+
 
   /**
    * Generates a full attribute payload from a partial natural-language description.
@@ -35,35 +71,43 @@ public class AiGenerationService {
    * @throws RuntimeException if the model output is empty or cannot be parsed as valid JSON
    */
   public AttributeGenerationResponse generateAttribute(String partialDescription){
-    String prompt = """
-            You are an assistant that generates metadata for variables in a data governance system.
+    if (partialDescription == null || partialDescription.isBlank()) {
+      throw new IllegalArgumentException("partialDescription must not be blank");
+    }
 
-            Based on this partial description: "%s"
 
-            Generate a JSON object with the following structure:
+    String prompt = getPromptTemplate().formatted(partialDescription);
 
-            {
-              "metadata": {
-                "entity_type": "variable",
-                "maintenance_agency": "BIRD",
-                "id": "...",
-                "code": "...",
-                "title": "...",
-                "domain_id": "...",
-                "parent_variable_id": null,
-                "valid_from": "YYYY-MM-DD",
-                "valid_to": "9999-12-31",
-                "description": "..."
-              }
-            }
 
-            Rules:
-            - id and code must be UPPERCASE_WITH_UNDERSCORES
-            - title must be in English
-            - domain_id must be coherent with the description
-            - valid_from must be today's date
-            - Respond STRICTLY in JSON.
-            """.formatted(partialDescription);
+//    String prompt = """
+//            You are an assistant that generates metadata for variables in a data governance system.
+//
+//            Based on this partial description: "%s"
+//
+//            Generate a JSON object with the following structure:
+//
+//            {
+//              "metadata": {
+//                "entity_type": "variable",
+//                "maintenance_agency": "BIRD",
+//                "id": "...",
+//                "code": "...",
+//                "title": "...",
+//                "domain_id": "...",
+//                "parent_variable_id": null,
+//                "valid_from": "YYYY-MM-DD",
+//                "valid_to": "9999-12-31",
+//                "description": "..."
+//              }
+//            }
+//
+//            Rules:
+//            - id and code must be UPPERCASE_WITH_UNDERSCORES
+//            - title must be in English
+//            - domain_id must be coherent with the description
+//            - valid_from must be today's date
+//            - Respond STRICTLY in JSON.
+//            """.formatted(partialDescription);
 
     ConverseRequest request = ConverseRequest.builder()
         .modelId(generationModelId)
@@ -79,18 +123,28 @@ public class AiGenerationService {
 
     ConverseResponse response = bedrockClient.converse(request);
 
-    try {
-      String aiRaw = response.output().message().content().stream()
-          .map(ContentBlock::text)
-          .filter(t -> t != null && !t.isBlank())
-          .findFirst()
-          .orElseThrow(() -> new IllegalStateException("Empty model output"));
+    String aiRaw = extractAssistantText(response);
+    String aiJson = sanitizeJsonPayload(aiRaw);
 
-      String aiJson = sanitizeJsonPayload(aiRaw);
+    try {
       return mapper.readValue(aiJson, AttributeGenerationResponse.class);
     } catch (Exception e) {
+      log.error("AI payload cannot be parsed as JSON. raw='{}'", abbreviate(aiRaw, 1200));
       throw new RuntimeException("Invalid AI JSON from Converse API", e);
     }
+
+//    try {
+//      String aiRaw = response.output().message().content().stream()
+//          .map(ContentBlock::text)
+//          .filter(t -> t != null && !t.isBlank())
+//          .findFirst()
+//          .orElseThrow(() -> new IllegalStateException("Empty model output"));
+//
+//      String aiJson = sanitizeJsonPayload(aiRaw);
+//      return mapper.readValue(aiJson, AttributeGenerationResponse.class);
+//    } catch (Exception e) {
+//      throw new RuntimeException("Invalid AI JSON from Converse API", e);
+//    }
   }
 
   /**
@@ -125,5 +179,41 @@ public class AiGenerationService {
 
     return s;
   }
+
+
+    private String extractAssistantText(ConverseResponse response) {
+      if (response == null || response.output() == null || response.output().message() == null) {
+        throw new IllegalStateException("Converse response has no output/message");
+      }
+
+      List<ContentBlock> blocks = response.output().message().content();
+      if (blocks == null || blocks.isEmpty()) {
+        throw new IllegalStateException("Converse response has empty content blocks");
+      }
+
+      for (ContentBlock block : blocks) {
+        String text = block.text();
+        if (text != null && !text.isBlank()) {
+          return text;
+        }
+      }
+
+      String rawBlocks = safeToJson(blocks);
+      throw new IllegalStateException("No text block found in Converse response. blocks=" + abbreviate(rawBlocks, 1200));
+    }
+
+    private String safeToJson(Object value) {
+      try {
+        return mapper.writeValueAsString(value);
+      } catch (Exception e) {
+        return String.valueOf(value);
+      }
+    }
+
+    private String abbreviate(String value, int maxLen) {
+      if (value == null) return "null";
+      return value.length() <= maxLen ? value : value.substring(0, maxLen) + "...(truncated)";
+    }
+
 
 }
