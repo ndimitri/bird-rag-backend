@@ -75,39 +75,7 @@ public class AiGenerationService {
       throw new IllegalArgumentException("partialDescription must not be blank");
     }
 
-
     String prompt = getPromptTemplate().formatted(partialDescription);
-
-
-//    String prompt = """
-//            You are an assistant that generates metadata for variables in a data governance system.
-//
-//            Based on this partial description: "%s"
-//
-//            Generate a JSON object with the following structure:
-//
-//            {
-//              "metadata": {
-//                "entity_type": "variable",
-//                "maintenance_agency": "BIRD",
-//                "id": "...",
-//                "code": "...",
-//                "title": "...",
-//                "domain_id": "...",
-//                "parent_variable_id": null,
-//                "valid_from": "YYYY-MM-DD",
-//                "valid_to": "9999-12-31",
-//                "description": "..."
-//              }
-//            }
-//
-//            Rules:
-//            - id and code must be UPPERCASE_WITH_UNDERSCORES
-//            - title must be in English
-//            - domain_id must be coherent with the description
-//            - valid_from must be today's date
-//            - Respond STRICTLY in JSON.
-//            """.formatted(partialDescription);
 
     ConverseRequest request = ConverseRequest.builder()
         .modelId(generationModelId)
@@ -132,19 +100,6 @@ public class AiGenerationService {
       log.error("AI payload cannot be parsed as JSON. raw='{}'", abbreviate(aiRaw, 1200));
       throw new RuntimeException("Invalid AI JSON from Converse API", e);
     }
-
-//    try {
-//      String aiRaw = response.output().message().content().stream()
-//          .map(ContentBlock::text)
-//          .filter(t -> t != null && !t.isBlank())
-//          .findFirst()
-//          .orElseThrow(() -> new IllegalStateException("Empty model output"));
-//
-//      String aiJson = sanitizeJsonPayload(aiRaw);
-//      return mapper.readValue(aiJson, AttributeGenerationResponse.class);
-//    } catch (Exception e) {
-//      throw new RuntimeException("Invalid AI JSON from Converse API", e);
-//    }
   }
 
   /**
