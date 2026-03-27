@@ -36,7 +36,7 @@ public class BedrockSimilarityService {
   private String knowledgeBaseId;
   @Value("${aws.bedrock.reranking-model-arn}")
   private String rerankingModelArn;
-  private static final int MAX_RESULTS = 10;
+  private static final int MAX_RESULTS = 100;
   private static final int MAX_RERANKING_RESULT = 5;
   private final BedrockAgentRuntimeClient bedrockAgentRuntimeClient;
 
