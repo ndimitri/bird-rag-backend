@@ -18,7 +18,7 @@ public class AttributeService {
     ObjectMapper mapper = new ObjectMapper();
     attributes = mapper.readValue(
         new ClassPathResource("VARIABLE.001.json").getInputStream(),
-        new TypeReference<List<Attribute>>() {
+        new TypeReference<>() {
         }
     );
   }

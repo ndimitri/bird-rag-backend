@@ -32,12 +32,6 @@ public class SimilarityController {
 
   private final BedrockSimilarityService service;
 
-  /**
-   * Searches the Knowledge Base for documents matching the query.
-   *
-   * @param query natural-language search query
-   * @return list of ranked retrieval results with metadata
-   */
   @GetMapping("/search")
   public ResponseEntity<List<RetrievedResult>> search(@RequestParam String query) {
     List<RetrievedResult> results = service.search(query);

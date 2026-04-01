@@ -27,6 +27,7 @@ Rules:
   * For each word of 3 chars or less, keep it entirely
   * Remove small words like "of", "the", "and" unless they are essential
   * Join with underscores and convert to UPPERCASE
+  * IN ENGLISH !
   * Examples:
     - "first_name" → "FRT_NME"
     - "TYPE_OF_ORGANISATION" → "TYP_ORG" (drop "OF", use first 3 of others)
@@ -36,3 +37,11 @@ Rules:
 - domain_id must be coherent with the description, also abbreviated following the same code pattern as "code" but applied to domain name
 - valid_from must be today's date in YYYY-MM-DD format
 - Respond STRICTLY in JSON, no markdown fences, no extra text before or after.
+- Do NOT start with generic openings like: "An attribute ...", "This attribute ...", "A field ...".
+- Write the description as a domain definition sentence, matching glossary style.
+- Prefer forms like:
+ - "A discriminator to distinguish ..."
+ - "The date on which ..."
+ - "The identifier of ..."
+- Keep it concise, specific, and reusable.
+- Do not repeat the user request wording verbatim.

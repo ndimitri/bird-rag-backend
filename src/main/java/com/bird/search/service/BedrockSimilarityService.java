@@ -105,16 +105,6 @@ public class BedrockSimilarityService {
   }
 
 
-  /**
-   * Searches the Knowledge Base with dynamic metadata filters applied to vector search.
-   *
-   * <p>This method allows filtering retrieved documents based on metadata attributes
-   * before applying the reranking step. Filters are combined using AND logic.</p>
-   *
-   * @param query end-user search query
-   * @param filters map of metadata key-value pairs to filter results (nullable)
-   * @return ranked list of retrieved results enriched with parsed metadata
-   */
   public List<AttributeSearchResult> searchWithDynamicMetadataFilters(
       String query,
       Map<String, String> filters
@@ -125,25 +115,18 @@ public class BedrockSimilarityService {
     if (filters != null && !filters.isEmpty()) {
 
       List<RetrievalFilter> filterList = filters.entrySet().stream()
-          .map(entry ->
-              RetrievalFilter.builder()
-                  .equalsValue(
-                      FilterAttribute.builder()
-                          .key(entry.getKey())
-                          .value(Document.fromString(entry.getValue()))
-                          .build()
-                  )
-                  .build()
-          )
+          .map(entry -> buildFilter(entry.getKey(), entry.getValue()))
+          .filter(Objects::nonNull)
           .toList();
 
-      // ✅ FIX CRITIQUE ICI
-      if (filterList.size() == 1) {
-        retrievalFilter = filterList.getFirst();      // ✅ PAS de andAll
-      } else {
-        retrievalFilter = RetrievalFilter.builder()
-            .andAll(filterList)                   // ✅ seulement si ≥ 2
-            .build();
+      if (!filterList.isEmpty()) {
+        if (filterList.size() == 1) {
+          retrievalFilter = filterList.getFirst();
+        } else {
+          retrievalFilter = RetrievalFilter.builder()
+              .andAll(filterList)
+              .build();
+        }
       }
     }
 
@@ -183,44 +166,25 @@ public class BedrockSimilarityService {
 
     RetrieveResponse response = bedrockAgentRuntimeClient.retrieve(request);
 
-//    return response.retrievalResults().stream()
-//        .map(result -> {
-//          KbDocument doc = KbContentParser.parse(result.content().text());
-//          return new RetrievedResult(
-//              doc.text(),
-//              result.score(),
-//              doc.metadata()
-//          );
-//        })
-//        .toList();
-
     return response.retrievalResults().stream()
         .map(result -> {
           String text = result.content().text();
 
-          // ✅ 1. Parser le CODE depuis le TXT
           String code = extractCode(text);
           if (code == null) {
             return null;
           }
 
-          // ✅ 2. Lookup DB (mock JSON / Oracle plus tard)
           return attributeService.getByCode(code)
-              .map(v -> new AttributeSearchResult(
-                  v.getCode(),
-                  v.getName(),
-                  v.getDescription(),
-                  v.getDomainId(),
-                  v.getMaintenanceAgencyId(),
-                  result.score()
-              ))
+              .map(v -> AttributeSearchResult.fromAttribute(v, result.score()))
               .orElse(null);
         })
         .filter(Objects::nonNull)
         .toList();
-
   }
 
+
+  //region Utils
   private String extractCode(String text) {
     for (String line : text.split("\n")) {
       if (line.startsWith("CODE:")) {
@@ -229,6 +193,84 @@ public class BedrockSimilarityService {
     }
     return null;
   }
+
+  private RetrievalFilter buildFilter(String key, String rawValue) {
+
+    if (rawValue == null || rawValue.isBlank()) {
+      return null;
+    }
+
+    rawValue = rawValue.trim();
+
+    // >=
+    if (rawValue.startsWith(">=")) {
+      return RetrievalFilter.builder()
+          .greaterThanOrEquals(
+              FilterAttribute.builder()
+                  .key(key)
+                  .value(Document.fromNumber(
+                      Long.parseLong(rawValue.substring(2))
+                  ))
+                  .build()
+          )
+          .build();
+    }
+
+    // <=
+    if (rawValue.startsWith("<=")) {
+      return RetrievalFilter.builder()
+          .lessThanOrEquals(
+              FilterAttribute.builder()
+                  .key(key)
+                  .value(Document.fromNumber(
+                      Long.parseLong(rawValue.substring(2))
+                  ))
+                  .build()
+          )
+          .build();
+    }
+
+    // >
+    if (rawValue.startsWith(">")) {
+      return RetrievalFilter.builder()
+          .greaterThan(
+              FilterAttribute.builder()
+                  .key(key)
+                  .value(Document.fromNumber(
+                      Long.parseLong(rawValue.substring(1))
+                  ))
+                  .build()
+          )
+          .build();
+    }
+
+    // <
+    if (rawValue.startsWith("<")) {
+      return RetrievalFilter.builder()
+          .lessThan(
+              FilterAttribute.builder()
+                  .key(key)
+                  .value(Document.fromNumber(
+                      Long.parseLong(rawValue.substring(1))
+                  ))
+                  .build()
+          )
+          .build();
+    }
+
+    // = (égalité implicite)
+    return RetrievalFilter.builder()
+        .equalsValue(
+            FilterAttribute.builder()
+                .key(key)
+                .value(Document.fromString(rawValue))
+                .build()
+        )
+        .build();
+  }
+
+
+  //endregion
 
 
 
