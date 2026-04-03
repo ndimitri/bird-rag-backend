@@ -46,44 +46,6 @@ public class BedrockSimilarityService {
   private final AttributeService attributeService;
 
   /**
-   * Searches the configured Knowledge Base with a natural-language query.
-   *
-   * @param query end-user search query
-   * @return ranked list of retrieved results enriched with parsed metadata
-   */
-  public List<RetrievedResult> search(String query) {
-    RetrieveRequest request = RetrieveRequest.builder()
-        .knowledgeBaseId(knowledgeBaseId)
-        .retrievalQuery(KnowledgeBaseQuery.builder().text(query).build())
-        .retrievalConfiguration(KnowledgeBaseRetrievalConfiguration.builder()
-            .vectorSearchConfiguration(KnowledgeBaseVectorSearchConfiguration.builder()
-                .numberOfResults(MAX_RESULTS)
-                .rerankingConfiguration(VectorSearchRerankingConfiguration.builder()
-                    .type(VectorSearchRerankingConfigurationType.BEDROCK_RERANKING_MODEL)
-                    .bedrockRerankingConfiguration(
-                        VectorSearchBedrockRerankingConfiguration.builder()
-                            .modelConfiguration(
-                                VectorSearchBedrockRerankingModelConfiguration.builder()
-                                    .modelArn(rerankingModelArn)
-                                    .build())
-                            .numberOfRerankedResults(MAX_RERANKING_RESULT)
-                            .build())
-                    .build())
-                .build())
-            .build())
-        .build();
-
-    RetrieveResponse response = bedrockAgentRuntimeClient.retrieve(request);
-
-    return response.retrievalResults().stream()
-        .map(result -> {
-          KbDocument doc = KbContentParser.parse(result.content().text());
-          return new RetrievedResult(doc.text(), result.score(), doc.metadata());
-        })
-        .toList();
-  }
-
-  /**
    * Performs retrieval with dynamic metadata filters and maps results to attribute DTOs.
    *
    * @param query free-text query

@@ -28,11 +28,6 @@ public class SimilarityController {
 
   private final BedrockSimilarityService service;
 
-  /*@GetMapping("/search")
-  public ResponseEntity<List<RetrievedResult>> search(@RequestParam String query) {
-    List<RetrievedResult> results = service.search(query);
-    return ResponseEntity.ok(results);
-  }*/
 
 
   @PostMapping("/search/filter")
