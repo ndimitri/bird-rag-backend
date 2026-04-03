@@ -1,10 +1,7 @@
 package com.bird.search.service;
 
 import com.bird.search.dto.AttributeSearchResult;
-import com.bird.search.dto.KbDocument;
-import com.bird.search.dto.RetrievedResult;
 import com.bird.search.utils.BedrockFilterUtils;
-import com.bird.search.utils.KbContentParser;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
