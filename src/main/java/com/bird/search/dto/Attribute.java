@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
-@JsonIgnoreProperties(ignoreUnknown = true) // optionnel mais pratique si ton JSON évolue
+@JsonIgnoreProperties(ignoreUnknown = true) // Empeche à Jackson de lever une exception pour les propriétés JSON inconnues
 public class Attribute {
 
   @JsonProperty("MAINTENANCE_AGENCY_ID")
