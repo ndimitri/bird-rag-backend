@@ -6,6 +6,7 @@
 package com.bird.search.controller;
 
 import com.bird.search.dto.AttributeSearchResult;
+import com.bird.search.dto.LegalDocumentSearchResult;
 import com.bird.search.dto.MetadataSearchRequest;
 import com.bird.search.service.BedrockSimilarityService;
 import java.util.List;
@@ -36,5 +37,13 @@ public class SimilarityController {
 
 
   }
+
+  @PostMapping("search/filter/legal-documents")
+  public List<LegalDocumentSearchResult> searchLegalDocumentsWithMetadataFilters(@RequestBody MetadataSearchRequest request) {
+    return service.searchLegalDocumentsWithDynamicMetadataFilters(request.getQuery(), request.getFilters());
+  }
+
+
+
 
 }
