@@ -43,6 +43,7 @@ public class BedrockSimilarityService {
 
   private static final int MAX_RESULTS = 100;
   private static final int MAX_RERANKING_RESULT = 5;
+  private static final int LEGAL_DOCUMENTS_MAX_RERANKING_RESULT = 10;
 
   private final BedrockAgentRuntimeClient bedrockAgentRuntimeClient;
   private final AttributeService attributeService;
@@ -131,7 +132,7 @@ public class BedrockSimilarityService {
                                                 .modelArn(rerankingModelArn)
                                                 .build()
                                         )
-                                        .numberOfRerankedResults(MAX_RERANKING_RESULT)
+                                        .numberOfRerankedResults(LEGAL_DOCUMENTS_MAX_RERANKING_RESULT)
                                         .build()
                                 )
                                 .build()
@@ -152,7 +153,7 @@ public class BedrockSimilarityService {
             return null;
           }
 
-          // --- 1️⃣ infos de base ---
+          // --- infos de base ---
           String text = result.content() != null
               ? result.content().text()
               : null;
@@ -160,12 +161,12 @@ public class BedrockSimilarityService {
           String s3Uri = result.location().s3Location().uri();
           Double score = result.score();
 
-          // --- 2️⃣ titre (fallback = nom de fichier S3) ---
+          // --- titre (fallback = nom de fichier S3) ---
           String title;
           int lastSlash = s3Uri.lastIndexOf('/');
           title = lastSlash != -1 ? s3Uri.substring(lastSlash + 1) : s3Uri;
 
-          // --- 3️⃣ metadata Bedrock ---
+          // --- metadata Bedrock ---
           Map<String, Document> m = result.metadata();
 
           String entityType = m != null && m.containsKey("entity_type")
@@ -200,7 +201,11 @@ public class BedrockSimilarityService {
               ? m.get("source_url").asString()
               : null;
 
-          // --- 4️⃣ construction DTO ---
+          Integer pageNumber = m != null && m.containsKey("x-amz-bedrock-kb-document-page-number")
+              ? m.get("x-amz-bedrock-kb-document-page-number").asNumber().intValue()
+              : null;
+
+          // --- construction DTO ---
           return new LegalDocumentSearchResult(
               title,
               text,
@@ -213,7 +218,8 @@ public class BedrockSimilarityService {
               attachedVariable,
               jurisdiction,
               validFrom,
-              sourceUrl
+              sourceUrl,
+              pageNumber
           );
         })
         .filter(Objects::nonNull)

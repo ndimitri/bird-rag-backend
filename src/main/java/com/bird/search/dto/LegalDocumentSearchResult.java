@@ -18,7 +18,8 @@ public record LegalDocumentSearchResult(
     String attachedVariable,
     String jurisdiction,
     String validFrom,
-    String sourceUrl
+    String sourceUrl,
+    Integer pageNumber
 
 ) {
 
