@@ -87,7 +87,9 @@ public class BedrockSimilarityService {
 
     return response.retrievalResults().stream()
         .map(result -> {
-          String code = BedrockFilterUtils.extractCode(result.content().text());
+          String code = result.metadata() != null && result.metadata().containsKey("CODE")
+              ? result.metadata().get("CODE").asString()
+              : null;
           if (code == null) {
             return null;
           }

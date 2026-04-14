@@ -14,21 +14,6 @@ import software.amazon.awssdk.services.bedrockagentruntime.model.RetrievalFilter
 public class BedrockFilterUtils {
 
   /**
-   * Extracts the value of a line starting with {@code CODE:}.
-   *
-   * @param text raw knowledge base content
-   * @return extracted code or {@code null} when not found
-   */
-  public static String extractCode(String text) {
-    for (String line : text.split("\n")) {
-      if (line.startsWith("CODE:")) {
-        return line.substring("CODE:".length()).trim();
-      }
-    }
-    return null;
-  }
-
-  /**
    * Builds a Bedrock {@link RetrievalFilter} from a key and raw value.
    *
    * <p>Supported operators: {@code >=}, {@code <=}, {@code >}, {@code <}. If no operator is
