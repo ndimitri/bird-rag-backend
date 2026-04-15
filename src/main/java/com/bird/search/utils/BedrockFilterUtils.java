@@ -23,6 +23,7 @@ public class BedrockFilterUtils {
    * @param rawValue metadata filter value
    * @return filter instance or {@code null} when input is blank/invalid
    */
+
   public static RetrievalFilter buildFilter(String key, String rawValue) {
     if (rawValue == null || rawValue.isBlank()) {
       return null;
@@ -31,41 +32,56 @@ public class BedrockFilterUtils {
     String trimmed = rawValue.trim();
 
     try {
-      if (trimmed.startsWith(">=")) {
-        long n = Long.parseLong(trimmed.substring(2).trim());
-        return RetrievalFilter.builder()
-            .greaterThanOrEquals(FilterAttribute.builder().key(key).value(Document.fromNumber(n)).build())
+      return switch (getOperator(trimmed)) {
+        case ">=" -> {
+          long n = Long.parseLong(trimmed.substring(2).trim());
+          yield RetrievalFilter.builder()
+              .greaterThanOrEquals(FilterAttribute.builder().key(key).value(Document.fromNumber(n)).build())
+              .build();
+        }
+        case "<=" -> {
+          long n = Long.parseLong(trimmed.substring(2).trim());
+          yield RetrievalFilter.builder()
+              .lessThanOrEquals(FilterAttribute.builder().key(key).value(Document.fromNumber(n)).build())
+              .build();
+        }
+        case ">" -> {
+          long n = Long.parseLong(trimmed.substring(1).trim());
+          yield RetrievalFilter.builder()
+              .greaterThan(FilterAttribute.builder().key(key).value(Document.fromNumber(n)).build())
+              .build();
+        }
+        case "<" -> {
+          long n = Long.parseLong(trimmed.substring(1).trim());
+          yield RetrievalFilter.builder()
+              .lessThan(FilterAttribute.builder().key(key).value(Document.fromNumber(n)).build())
+              .build();
+        }
+        default -> RetrievalFilter.builder()
+            .equalsValue(FilterAttribute.builder().key(key).value(Document.fromString(trimmed)).build())
             .build();
-      }
-
-      if (trimmed.startsWith("<=")) {
-        long n = Long.parseLong(trimmed.substring(2).trim());
-        return RetrievalFilter.builder()
-            .lessThanOrEquals(FilterAttribute.builder().key(key).value(Document.fromNumber(n)).build())
-            .build();
-      }
-
-      if (trimmed.startsWith(">")) {
-        long n = Long.parseLong(trimmed.substring(1).trim());
-        return RetrievalFilter.builder()
-            .greaterThan(FilterAttribute.builder().key(key).value(Document.fromNumber(n)).build())
-            .build();
-      }
-
-      if (trimmed.startsWith("<")) {
-        long n = Long.parseLong(trimmed.substring(1).trim());
-        return RetrievalFilter.builder()
-            .lessThan(FilterAttribute.builder().key(key).value(Document.fromNumber(n)).build())
-            .build();
-      }
+      };
     } catch (NumberFormatException e) {
       return null;
     }
-
-    return RetrievalFilter.builder()
-        .equalsValue(FilterAttribute.builder().key(key).value(Document.fromString(trimmed)).build())
-        .build();
   }
+
+  /**
+   * Determines the comparison operator present at the beginning of a raw value.
+   *
+   * <p>Recognized operators are {@code >=}, {@code <=}, {@code >}, and {@code <}. If no operator is detected, an empty string is returned.</p>
+   *
+   * @param trimmed already-trimmed value to analyze * @return the detected operator, or an empty string if no operator is present
+   */
+   private static String getOperator(String trimmed) {
+   if (trimmed.startsWith(">=") || trimmed.startsWith("<=")) {
+   return trimmed.substring(0,2);
+   }
+   if (trimmed.startsWith(">") || trimmed.startsWith("<")) {
+   return trimmed.substring(0,1);
+   }
+   return "";
+   }
 
   /**
    * Builds a single Bedrock filter from a map of metadata constraints.
