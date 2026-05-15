@@ -71,7 +71,8 @@ public class BedrockFilterUtils {
    *
    * <p>Recognized operators are {@code >=}, {@code <=}, {@code >}, and {@code <}. If no operator is detected, an empty string is returned.</p>
    *
-   * @param trimmed already-trimmed value to analyze * @return the detected operator, or an empty string if no operator is present
+   * @param trimmed already-trimmed value to analyze *
+   * @return the detected operator, or an empty string if no operator is present
    */
    private static String getOperator(String trimmed) {
    if (trimmed.startsWith(">=") || trimmed.startsWith("<=")) {
