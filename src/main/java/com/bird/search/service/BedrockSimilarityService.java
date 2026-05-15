@@ -41,6 +41,7 @@ public class BedrockSimilarityService {
   @Value("${aws.bedrock.reranking-model-arn}")
   private String rerankingModelArn;
 
+  //Maximum number of results to retrieve from the knowledge base before reranking
   private static final int MAX_RESULTS = 100;
   private static final int MAX_RERANKING_RESULT = 5;
   private static final int LEGAL_DOCUMENTS_MAX_RERANKING_RESULT = 10;
